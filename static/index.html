@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CYBER VIPER // Neon Arcade & Match History</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Top Navigation Header -->
+    <header class="app-header">
+      <div class="brand">
+        <span class="brand-glow-icon">⚡</span>
+        <div>
+          <h1 class="brand-title">CYBER VIPER</h1>
+          <p class="brand-subtitle">RETRO ARCADE // SQLITE DATABASE POWERED</p>
+        </div>
+      </div>
+
+      <div class="header-controls">
+        <div class="player-tag">
+          <label for="playerNameInput">PILOT:</label>
+          <input type="text" id="playerNameInput" maxlength="15" value="CyberKnight" placeholder="Enter name...">
+        </div>
+        <button id="soundToggleBtn" class="btn-icon" title="Toggle Sound">🔊</button>
+      </div>
+    </header>
+
+    <!-- Main Content Layout -->
+    <main class="main-layout">
+      <!-- Game Section (Left / Center) -->
+      <section class="game-card">
+        <!-- Game Stats Bar -->
+        <div class="hud-bar">
+          <div class="hud-item">
+            <span class="hud-label">SCORE</span>
+            <span id="scoreDisplay" class="hud-value neon-cyan">0</span>
+          </div>
+          <div class="hud-item">
+            <span class="hud-label">HIGH SCORE</span>
+            <span id="highScoreDisplay" class="hud-value neon-gold">0</span>
+          </div>
+          <div class="hud-item">
+            <span class="hud-label">APPLES</span>
+            <span id="applesDisplay" class="hud-value neon-pink">0</span>
+          </div>
+          <div class="hud-item">
+            <span class="hud-label">TIME</span>
+            <span id="timerDisplay" class="hud-value neon-white">00:00</span>
+          </div>
+        </div>
+
+        <!-- Canvas Container with Interactive Overlays -->
+        <div class="canvas-wrapper">
+          <canvas id="gameCanvas" width="600" height="600"></canvas>
+
+          <!-- Start Overlay -->
+          <div id="startOverlay" class="canvas-overlay active">
+            <div class="overlay-card">
+              <h2 class="neon-cyan glitch-text">READY PILOT?</h2>
+              <p>Navigate the grid, collect energy nodes, and dominate the database records.</p>
+              
+              <div class="mode-selection">
+                <label>GAME MODE</label>
+                <div class="segmented-control" id="modeSelector">
+                  <button class="seg-btn active" data-mode="Classic">Classic</button>
+                  <button class="seg-btn" data-mode="Speed Rush">Speed Rush</button>
+                  <button class="seg-btn" data-mode="Portal">Portal Wrap</button>
+                </div>
+              </div>
+
+              <div class="difficulty-selection">
+                <label>DIFFICULTY</label>
+                <div class="segmented-control" id="diffSelector">
+                  <button class="seg-btn" data-diff="Easy">Easy</button>
+                  <button class="seg-btn active" data-diff="Normal">Normal</button>
+                  <button class="seg-btn" data-diff="Hard">Hard</button>
+                  <button class="seg-btn" data-diff="Insane">Insane</button>
+                </div>
+              </div>
+
+              <button id="startGameBtn" class="btn btn-primary pulse">START RUN</button>
+              <div class="controls-hint">Use <b>W A S D</b> or <b>Arrow Keys</b> to navigate. <b>SPACE</b> to pause.</div>
+            </div>
+          </div>
+
+          <!-- Pause Overlay -->
+          <div id="pauseOverlay" class="canvas-overlay">
+            <div class="overlay-card">
+              <h2 class="neon-gold">SYSTEM PAUSED</h2>
+              <p>Take a breath, pilot.</p>
+              <button id="resumeGameBtn" class="btn btn-primary">RESUME</button>
+              <button id="quitGameBtn" class="btn btn-danger">ABORT RUN</button>
+            </div>
+          </div>
+
+          <!-- Game Over Overlay -->
+          <div id="gameOverOverlay" class="canvas-overlay">
+            <div class="overlay-card">
+              <h2 class="neon-pink">MISSION FAILED</h2>
+              <div id="newHighBadge" class="new-high-badge" style="display: none;">🏆 NEW ALL-TIME RECORD! 🏆</div>
+              
+              <div class="run-stats-grid">
+                <div class="stat-box">
+                  <span class="label">FINAL SCORE</span>
+                  <span id="finalScore" class="val neon-cyan">0</span>
+                </div>
+                <div class="stat-box">
+                  <span class="label">APPLES</span>
+                  <span id="finalApples" class="val neon-pink">0</span>
+                </div>
+                <div class="stat-box">
+                  <span class="label">SURVIVED</span>
+                  <span id="finalDuration" class="val neon-white">0s</span>
+                </div>
+                <div class="stat-box">
+                  <span class="label">DATABASE</span>
+                  <span id="dbStatus" class="val neon-green">SAVED ✓</span>
+                </div>
+              </div>
+
+              <div class="overlay-actions">
+                <button id="restartGameBtn" class="btn btn-primary">PLAY AGAIN</button>
+                <button id="changeModeBtn" class="btn btn-secondary">CONFIG</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Virtual Controls (Mobile / Mouse) -->
+        <div class="virtual-controls">
+          <div class="dpad">
+            <button class="dpad-btn up" id="dpadUp" title="Up">▲</button>
+            <div class="dpad-row">
+              <button class="dpad-btn left" id="dpadLeft" title="Left">◀</button>
+              <button class="dpad-btn action" id="dpadPause" title="Pause">⏸</button>
+              <button class="dpad-btn right" id="dpadRight" title="Right">▶</button>
+            </div>
+            <button class="dpad-btn down" id="dpadDown" title="Down">▼</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Dashboard & Database History Section (Right) -->
+      <section class="dashboard-card">
+        <!-- Live Global Metrics Summary -->
+        <div class="metrics-grid">
+          <div class="metric-card">
+            <div class="metric-icon">🏆</div>
+            <div class="metric-info">
+              <div class="metric-val" id="statHighScore">0</div>
+              <div class="metric-label">High Score</div>
+            </div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-icon">🎮</div>
+            <div class="metric-info">
+              <div class="metric-val" id="statTotalGames">0</div>
+              <div class="metric-label">Games Played</div>
+            </div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-icon">🍏</div>
+            <div class="metric-info">
+              <div class="metric-val" id="statTotalApples">0</div>
+              <div class="metric-label">Total Apples</div>
+            </div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-icon">⏱️</div>
+            <div class="metric-info">
+              <div class="metric-val" id="statTotalTime">0m</div>
+              <div class="metric-label">Total Playtime</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tabs: Match History vs Leaderboard -->
+        <div class="tab-header">
+          <div class="tab-buttons">
+            <button class="tab-btn active" data-tab="historyTab">MATCH HISTORY</button>
+            <button class="tab-btn" data-tab="leaderboardTab">LEADERBOARD</button>
+          </div>
+          <div class="tab-tools">
+            <select id="modeFilterSelect" class="filter-dropdown" title="Filter by Mode">
+              <option value="All">All Modes</option>
+              <option value="Classic">Classic</option>
+              <option value="Speed Rush">Speed Rush</option>
+              <option value="Portal">Portal</option>
+            </select>
+            <button id="refreshBtn" class="btn-tool" title="Refresh from Database">🔄</button>
+            <button id="clearHistoryBtn" class="btn-tool danger" title="Clear All History">🗑️</button>
+          </div>
+        </div>
+
+        <!-- Tab 1: Match History Table -->
+        <div id="historyTab" class="tab-content active">
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>DATE & TIME</th>
+                  <th>PILOT</th>
+                  <th>MODE</th>
+                  <th>DIFF</th>
+                  <th>SCORE</th>
+                  <th>APPLES</th>
+                  <th>TIME</th>
+                </tr>
+              </thead>
+              <tbody id="historyTableBody">
+                <tr>
+                  <td colspan="7" class="empty-state">Loading match history...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Tab 2: Top Leaderboard -->
+        <div id="leaderboardTab" class="tab-content">
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>RANK</th>
+                  <th>PILOT</th>
+                  <th>SCORE</th>
+                  <th>MODE</th>
+                  <th>DIFF</th>
+                  <th>DATE</th>
+                </tr>
+              </thead>
+              <tbody id="leaderboardTableBody">
+                <tr>
+                  <td colspan="6" class="empty-state">Loading leaderboard...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Footer / Database Info Status -->
+        <footer class="db-footer">
+          <span class="db-dot"></span>
+          <span>SQLite Database: <code class="code-badge">game_history.db</code></span>
+          <span class="db-status-text" id="liveSyncStatus">Synchronized</span>
+        </footer>
+      </section>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
