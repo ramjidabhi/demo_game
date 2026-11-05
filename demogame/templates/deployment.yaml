@@ -1,16 +1,16 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "demo.fullname" . }}
+  name: {{ include "demogame.fullname" . }}
   labels:
-    {{- include "demo.labels" . | nindent 4 }}
+    {{- include "demogame.labels" . | nindent 4 }}
 spec:
   {{- if not .Values.autoscaling.enabled }}
   replicas: {{ .Values.replicaCount }}
   {{- end }}
   selector:
     matchLabels:
-      {{- include "demo.selectorLabels" . | nindent 6 }}
+      {{- include "demogame.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       {{- with .Values.podAnnotations }}
@@ -18,7 +18,7 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       labels:
-        {{- include "demo.labels" . | nindent 8 }}
+        {{- include "demogame.labels" . | nindent 8 }}
         {{- with .Values.podLabels }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -27,7 +27,7 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      serviceAccountName: {{ include "demo.serviceAccountName" . }}
+      serviceAccountName: {{ include "demogame.serviceAccountName" . }}
       {{- with .Values.podSecurityContext }}
       securityContext:
         {{- toYaml . | nindent 8 }}
@@ -42,11 +42,8 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
             - name: http
-              containerPort: {{ .Values.service.targetPort | default .Values.service.port }}
+              containerPort: {{ .Values.service.port }}
               protocol: TCP
-          env:
-            - name: PORT
-              value: {{ .Values.service.targetPort | default .Values.service.port | quote }}
           {{- with .Values.livenessProbe }}
           livenessProbe:
             {{- toYaml . | nindent 12 }}
