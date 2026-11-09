@@ -1,0 +1,24 @@
+.env
+.env.*
+*.db
+*.sqlite
+*.sqlite3
+terraform.tfstate
+terraform.tfstate.*
+.terraform/
+.sonar/
+
+# Local secrets and environment files
+!.env.example
+
+# Local databases
+
+# Terraform state and local data
+*.tfstate
+*.tfstate.*
+
+# SonarQube local data
+
+# Python cache
+__pycache__/
+*.pyc
