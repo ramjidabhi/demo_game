@@ -1,5 +1,4 @@
-﻿
-name: CYBER VIPER DevSecOps CI
+﻿name: CYBER VIPER DevSecOps CI
 
 on:
   push:
@@ -13,7 +12,7 @@ permissions:
 
 jobs:
   validate-test-scan:
-    name: Docker tests, Helm validation and Trivy scans
+    name: Docker tests and Trivy scans
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -24,18 +23,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Python and application dependencies are installed
-      # inside the Docker image, not separately on the runner.
-
-      - name: Set up Helm
-        uses: azure/setup-helm@v4
-
-      - name: Validate Helm chart
-        run: |
-          helm lint ./demogame
-          helm template cyber-viper ./demogame \
-            --namespace cyber-viper \
-            > rendered-manifests.yaml
+      # Helm steps have been removed since k8s files are temporarily deleted.
+      # This also prevents the Trivy yaml unmarshal error.
 
       - name: Scan source, dependencies, secrets and configuration
         uses: aquasecurity/trivy-action@v0.36.0
