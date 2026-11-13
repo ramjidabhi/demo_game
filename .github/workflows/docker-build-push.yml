@@ -1,4 +1,4 @@
-
+﻿
 name: CYBER VIPER DevSecOps CI
 
 on:
@@ -49,7 +49,7 @@ jobs:
             > rendered-manifests.yaml
 
       - name: Scan source, dependencies, secrets and configuration with Trivy
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: fs
           scan-ref: .
@@ -67,7 +67,7 @@ jobs:
             -t cyber-viper:${{ github.sha }} .
 
       - name: Scan application container image with Trivy
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: image
           image-ref: cyber-viper:${{ github.sha }}
@@ -176,3 +176,4 @@ jobs:
             -v "$($env:GITHUB_WORKSPACE):/usr/src" `
             -w /usr/src `
             sonarsource/sonar-scanner-cli:latest
+
