@@ -1,4 +1,31 @@
-﻿services:
+name: devops-tools
+
+services:
+  web:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: demo_game_web:latest
+    container_name: demo_game_app
+    restart: unless-stopped
+    environment:
+      PORT: "8000"
+      HOST: "0.0.0.0"
+      SQLITE_PATH: /app/data/game_history.db
+      SQLITE_DATABASE: /app/data/game_history.db
+      DATABASE_URL: sqlite:////app/data/game_history.db
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - sqlite_data:/app/data
+    healthcheck:
+      test: ["CMD", "python", "/app/_health.py", "8000"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    mem_limit: 512m
+
   sonarqube:
     image: sonarqube:community
     container_name: sonarqube
@@ -14,6 +41,9 @@
     image: prom/prometheus:latest
     container_name: prometheus
     restart: unless-stopped
+    depends_on:
+      web:
+        condition: service_healthy
     ports:
       - "127.0.0.1:9090:9090"
     volumes:
@@ -22,21 +52,30 @@
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=15d"
+      - "--web.enable-lifecycle"
+    mem_limit: 512m
 
   grafana:
     image: grafana/grafana:latest
     container_name: grafana
     restart: unless-stopped
+    depends_on:
+      - prometheus
     ports:
       - "127.0.0.1:3000:3000"
     environment:
       GF_SECURITY_ADMIN_USER: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
     volumes:
       - grafana_data:/var/lib/grafana
-    depends_on:
-      - prometheus
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    mem_limit: 512m
 
 volumes:
+  sqlite_data:
   sonarqube_data:
   sonarqube_extensions:
   sonarqube_logs:

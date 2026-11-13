@@ -22,3 +22,13 @@ terraform.tfstate.*
 # Python cache
 __pycache__/
 *.pyc
+
+# Test and security scan output
+.coverage
+coverage.xml
+.pytest_cache/
+coverage/
+trivy-*.json
+trivy-*.sarif
+rendered-manifests.yaml
+

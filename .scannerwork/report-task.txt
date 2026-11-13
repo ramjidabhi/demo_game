@@ -1,0 +1,6 @@
+projectKey=demo_game
+serverUrl=http://localhost:9000
+serverVersion=26.11.0.134175
+dashboardUrl=http://localhost:9000/dashboard?id=demo_game
+ceTaskId=88dd1bec-87da-4135-b08e-35b067715941
+ceTaskUrl=http://localhost:9000/api/ce/task?id=88dd1bec-87da-4135-b08e-35b067715941

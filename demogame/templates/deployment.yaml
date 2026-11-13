@@ -1,4 +1,4 @@
-﻿apiVersion: apps/v1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ include "demogame.fullname" . }}
@@ -13,6 +13,10 @@ spec:
     metadata:
       labels:
         {{- include "demogame.selectorLabels" . | nindent 8 }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
     spec:
       serviceAccountName: {{ include "demogame.serviceAccountName" . }}
       securityContext:

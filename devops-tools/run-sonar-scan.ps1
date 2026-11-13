@@ -1,0 +1,41 @@
+$ErrorActionPreference = "Stop"
+
+$repoRoot = Split-Path -Parent $PSScriptRoot
+Set-Location $repoRoot
+
+Write-Host "Enter a SonarQube user token. It will not be saved in the project." -ForegroundColor Cyan
+$secureToken = Read-Host "SonarQube token" -AsSecureString
+$tokenPointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secureToken)
+
+$previousToken = $env:SONAR_TOKEN
+try {
+    $token = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($tokenPointer)
+    $env:SONAR_TOKEN = $token
+
+    docker network inspect devops-tools_default *> $null
+    if ($LASTEXITCODE -ne 0) {
+        throw "DevOps Docker network not found. Start the stack with .\devops-tools\start-devops.ps1 first."
+    }
+
+    docker run --rm `
+        --network devops-tools_default `
+        -e SONAR_HOST_URL="http://sonarqube:9000" `
+        -e SONAR_TOKEN `
+        -v "${repoRoot}:/usr/src" `
+        -w /usr/src `
+        sonarsource/sonar-scanner-cli:latest
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "SonarQube analysis failed. Review the scanner output above."
+    }
+
+    Write-Host "SonarQube analysis completed: http://localhost:9000/dashboard?id=demo_game2" -ForegroundColor Green
+}
+finally {
+    if ($tokenPointer -ne [IntPtr]::Zero) {
+        [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($tokenPointer)
+    }
+    $env:SONAR_TOKEN = $previousToken
+    $token = $null
+    $secureToken = $null
+}

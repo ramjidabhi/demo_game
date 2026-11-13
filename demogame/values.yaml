@@ -1,4 +1,4 @@
-﻿replicaCount: 1
+replicaCount: 1
 
 image:
   repository: demok9nbc.azurecr.io/demo-game
@@ -16,7 +16,10 @@ serviceAccount:
   annotations: {}
   name: ""
 
-podAnnotations: {}
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/path: "/metrics"
+  prometheus.io/port: "8000"
 podLabels: {}
 
 podSecurityContext:

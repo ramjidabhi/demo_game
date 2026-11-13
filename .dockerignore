@@ -26,3 +26,21 @@ coverage
 secrets/
 *.pem
 *.key
+
+# DevSecOps, cloud infrastructure and deployment manifests are not part of the app image
+devops-tools
+infrastructure
+k8s
+demogame
+
+# Local developer and security artifacts
+.sonar
+.coverage
+coverage.xml
+trivy-*.json
+rendered-manifests.yaml
+*.tfstate
+*.tfstate.*
+*.tfvars
+tfplan*
+

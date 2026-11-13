@@ -10,6 +10,8 @@ from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 import json
 import os
 import sys
+import threading
+import time
 import urllib.parse
 from typing import Any
 import database
@@ -25,11 +27,89 @@ if sys.platform == "win32":
     except Exception:
         pass
 
+
+# Lightweight Prometheus metrics; deliberately uses the Python standard library
+# so the game application keeps its zero-runtime-dependency design.
+_METRICS_LOCK = threading.Lock()
+_HTTP_REQUESTS = {}
+_HTTP_DURATION_BUCKETS = {0.1: 0, 0.25: 0, 0.5: 0, 1.0: 0, 2.5: 0, 5.0: 0}
+_HTTP_DURATION_COUNT = 0
+_HTTP_DURATION_SUM = 0.0
+
+
+def _record_http_request(method: str, status: int) -> None:
+    key = (method or "UNKNOWN", int(status))
+    with _METRICS_LOCK:
+        _HTTP_REQUESTS[key] = _HTTP_REQUESTS.get(key, 0) + 1
+
+
+def _record_http_duration(duration: float) -> None:
+    global _HTTP_DURATION_COUNT, _HTTP_DURATION_SUM
+    with _METRICS_LOCK:
+        _HTTP_DURATION_COUNT += 1
+        _HTTP_DURATION_SUM += duration
+        for boundary in _HTTP_DURATION_BUCKETS:
+            if duration <= boundary:
+                _HTTP_DURATION_BUCKETS[boundary] += 1
+
+
+def _render_prometheus_metrics() -> bytes:
+    with _METRICS_LOCK:
+        request_rows = list(_HTTP_REQUESTS.items())
+        bucket_rows = list(_HTTP_DURATION_BUCKETS.items())
+        duration_count = _HTTP_DURATION_COUNT
+        duration_sum = _HTTP_DURATION_SUM
+
+    lines = [
+        "# HELP cyber_viper_build_info CYBER VIPER application build information.",
+        "# TYPE cyber_viper_build_info gauge",
+        'cyber_viper_build_info{version="1.0"} 1',
+        "# HELP cyber_viper_http_requests_total Total HTTP responses served by the application.",
+        "# TYPE cyber_viper_http_requests_total counter",
+    ]
+    for (method, status), count in sorted(request_rows):
+        lines.append(
+            f'cyber_viper_http_requests_total{{method="{method}",status="{status}"}} {count}'
+        )
+
+    lines.extend([
+        "# HELP cyber_viper_http_request_duration_seconds HTTP request duration in seconds.",
+        "# TYPE cyber_viper_http_request_duration_seconds histogram",
+    ])
+    for boundary, count in bucket_rows:
+        lines.append(
+            f'cyber_viper_http_request_duration_seconds_bucket{{le="{boundary}"}} {count}'
+        )
+    lines.extend([
+        f'cyber_viper_http_request_duration_seconds_bucket{{le="+Inf"}} {duration_count}',
+        f"cyber_viper_http_request_duration_seconds_sum {duration_sum:.6f}",
+        f"cyber_viper_http_request_duration_seconds_count {duration_count}",
+        "",
+    ])
+    return "\n".join(lines).encode("utf-8")
+
+
 class GameRequestHandler(SimpleHTTPRequestHandler):
     """Custom request handler supporting API endpoints and static file serving."""
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=STATIC_DIR, **kwargs)
+
+    def send_response(self, code, message=None):
+        # Count normal application responses, but do not count Prometheus scrapes.
+        request_path = urllib.parse.urlparse(getattr(self, "path", "")).path
+        if request_path != "/metrics":
+            _record_http_request(getattr(self, "command", "UNKNOWN"), code)
+        super().send_response(code, message)
+
+    def handle_one_request(self):
+        started = time.perf_counter()
+        try:
+            super().handle_one_request()
+        finally:
+            request_path = urllib.parse.urlparse(getattr(self, "path", "")).path
+            if request_path and request_path != "/metrics":
+                _record_http_duration(time.perf_counter() - started)
 
     def _set_headers(self, status_code: int = 200, content_type: str = "application/json"):
         self.send_response(status_code)
@@ -59,6 +139,16 @@ class GameRequestHandler(SimpleHTTPRequestHandler):
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
         query_params = urllib.parse.parse_qs(parsed.query)
+
+        # Prometheus metrics endpoint (no third-party Python package required).
+        if path == "/metrics":
+            payload = _render_prometheus_metrics()
+            self._set_headers(
+                200,
+                "text/plain; version=0.0.4; charset=utf-8"
+            )
+            self.wfile.write(payload)
+            return
 
         # Health check endpoint for Kubernetes liveness & readiness probes
         if path in ("/health", "/healthz"):
