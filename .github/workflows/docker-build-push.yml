@@ -314,6 +314,6 @@ jobs:
         with:
           args: >
             -Dsonar.projectKey=cyber-viper
-            -Dsonar.organization=YOUR_ORGANIZATION
+            -Dsonar.organization=ram55o
             -Dsonar.sources=.
             -Dsonar.scanner.skipJreProvisioning=false
