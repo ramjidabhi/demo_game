@@ -284,7 +284,7 @@ jobs:
     timeout-minutes: 20
 
     env:
-      SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION }}
+      SONAR_ORGANIZATION: ${{ secrets.SONAR_ORGANIZATION }}
 
     steps:
 
@@ -347,7 +347,7 @@ jobs:
         with:
           args: >
             -Dsonar.projectKey=cyber-viper
-            -Dsonar.organization=${{ vars.SONAR_ORGANIZATION }}
+            -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION }}
             -Dsonar.sources=.
             -Dsonar.scanner.skipJreProvisioning=false
             -Dsonar.qualitygate.wait=false
