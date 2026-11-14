@@ -31,10 +31,10 @@ jobs:
         uses: actions/checkout@v4
 
       # ======================================
-      # TRIVY FILESYSTEM SCAN
+      # FILESYSTEM SECURITY SCAN
       # ======================================
 
-      - name: Scan source, dependencies, secrets and configuration
+      - name: Trivy filesystem security scan
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: fs
@@ -59,7 +59,7 @@ jobs:
       # PYTHON COMPILATION
       # ======================================
 
-      - name: Compile Python code inside Docker image
+      - name: Compile Python application
         run: |
           docker run --rm \
             --env SQLITE_PATH=/tmp/cyber-viper-compile.db \
@@ -70,7 +70,7 @@ jobs:
       # APPLICATION TESTS
       # ======================================
 
-      - name: Run application tests inside Docker image
+      - name: Run application tests
         run: |
           docker run --rm \
             --env SQLITE_PATH=/tmp/cyber-viper-tests.db \
@@ -78,10 +78,10 @@ jobs:
             python test_suite.py
 
       # ======================================
-      # TRIVY DOCKER IMAGE SCAN
+      # DOCKER IMAGE SECURITY SCAN
       # ======================================
 
-      - name: Scan Docker image with Trivy
+      - name: Trivy Docker image scan
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: image
@@ -120,7 +120,6 @@ jobs:
           echo "Waiting for Docker HEALTHCHECK..."
 
           for attempt in $(seq 1 40); do
-
             STATUS=$(docker inspect \
               --format='{{.State.Health.Status}}' \
               "$CONTAINER_NAME")
@@ -144,7 +143,7 @@ jobs:
             sleep 2
           done
 
-          echo "Checking application HTTP endpoints..."
+          echo "Checking application endpoints..."
 
           curl --fail --silent --show-error \
             http://127.0.0.1:18000/health
@@ -157,7 +156,7 @@ jobs:
             http://127.0.0.1:18000/api/stats \
             | grep -q "total_games"
 
-          echo "PASS: Docker container and endpoints are healthy."
+          echo "PASS: Application health checks successful."
 
       # ======================================
       # DOCKER HUB LOGIN
@@ -184,37 +183,29 @@ jobs:
 
           REMOTE_IMAGE="${DOCKERHUB_USERNAME}/cyber-viper"
 
-          echo "Tagging Docker images..."
-
           docker tag "$IMAGE" "${REMOTE_IMAGE}:${GITHUB_SHA}"
           docker tag "$IMAGE" "${REMOTE_IMAGE}:latest"
 
-          echo "Pushing versioned image..."
-
           docker push "${REMOTE_IMAGE}:${GITHUB_SHA}"
-
-          echo "Pushing latest image..."
-
           docker push "${REMOTE_IMAGE}:latest"
 
-          echo "PASS: Images successfully pushed to Docker Hub."
+          echo "PASS: Docker images published successfully."
 
       # ======================================
-      # SECURITY REPORT
+      # SECURITY FINDINGS REPORT
       # ======================================
 
-      - name: Report HIGH and CRITICAL security findings
+      - name: Report HIGH and CRITICAL findings
         if: always()
         shell: bash
         run: |
           set -u
 
           echo "======================================"
-          echo "CYBER VIPER SECURITY SUMMARY"
+          echo "CYBER VIPER SECURITY REPORT"
           echo "======================================"
 
           if [ -s trivy-fs-report.json ]; then
-
             echo "Filesystem findings:"
 
             jq '
@@ -235,13 +226,11 @@ jobs:
                 findings: .
               }
             ' trivy-fs-report.json
-
           else
             echo "WARNING: Filesystem report missing."
           fi
 
           if [ -s trivy-image-report.json ]; then
-
             echo "Docker image findings:"
 
             jq '
@@ -258,21 +247,18 @@ jobs:
                 findings: .
               }
             ' trivy-image-report.json
-
           else
             echo "WARNING: Image report missing."
           fi
 
-          echo "======================================"
           echo "Security findings are report-only."
-          echo "Pipeline continues."
-          echo "======================================"
+          echo "Continuing pipeline."
 
       # ======================================
-      # UPLOAD SECURITY REPORTS
+      # UPLOAD TRIVY REPORTS
       # ======================================
 
-      - name: Upload Trivy reports
+      - name: Upload Trivy security reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -284,7 +270,7 @@ jobs:
           retention-days: 14
 
   # ==========================================
-  # JOB 2: SONARQUBE CLOUD ANALYSIS
+  # JOB 2: SONARQUBE CLOUD CODE ANALYSIS
   # ==========================================
 
   sonarqube-analysis:
@@ -297,12 +283,44 @@ jobs:
        github.event_name == 'workflow_dispatch')
     timeout-minutes: 20
 
+    env:
+      SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION }}
+
     steps:
 
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      # ======================================
+      # VALIDATE SONAR CONFIGURATION
+      # ======================================
+
+      - name: Verify SonarQube configuration
+        shell: bash
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          set -Eeuo pipefail
+
+          if [ -z "$SONAR_TOKEN" ]; then
+            echo "ERROR: SONAR_TOKEN is missing."
+            exit 1
+          fi
+
+          if [ -z "$SONAR_ORGANIZATION" ]; then
+            echo "ERROR: SONAR_ORGANIZATION variable is missing."
+            exit 1
+          fi
+
+          if [ "$SONAR_ORGANIZATION" = "YOUR_ACTUAL_ORGANIZATION_KEY" ]; then
+            echo "ERROR: Replace the placeholder organization key."
+            exit 1
+          fi
+
+          echo "SonarQube configuration is present."
+          echo "Organization variable is configured."
 
       # ======================================
       # JAVA 21
@@ -319,7 +337,7 @@ jobs:
           java -version
 
       # ======================================
-      # SONARQUBE CLOUD SCAN
+      # SONARQUBE CLOUD ANALYSIS
       # ======================================
 
       - name: SonarQube Cloud analysis
@@ -329,10 +347,14 @@ jobs:
         with:
           args: >
             -Dsonar.projectKey=cyber-viper
-            -Dsonar.organization=YOUR_ACTUAL_ORGANIZATION_KEY
+            -Dsonar.organization=${{ vars.SONAR_ORGANIZATION }}
             -Dsonar.sources=.
             -Dsonar.scanner.skipJreProvisioning=false
             -Dsonar.qualitygate.wait=false
+
+      # ======================================
+      # SONARQUBE RESULT
+      # ======================================
 
       - name: SonarQube analysis summary
         if: success()
