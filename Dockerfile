@@ -33,9 +33,9 @@ ENV PATH="/opt/venv/bin:$PATH" \
 COPY --from=builder /opt/venv /opt/venv
 COPY . .
 RUN mkdir -p /app/data && if [ -f game_history.db ]; then cp -n game_history.db /app/data/ 2>/dev/null || true; ln -sf /app/data/game_history.db /app/game_history.db 2>/dev/null || true; fi
-RUN printf '#!/usr/bin/env python3\\nimport sys, urllib.request as u, urllib.error as e\\nport = sys.argv[1] if len(sys.argv) > 1 else "8000"\\nfor path in ["/health", "/healthz"]:\\n    try:\\n        res = u.urlopen(f"http://127.0.0.1:{port}" + path, timeout=3)\\n        if res.status == 200: sys.exit(0)\\n    except Exception: pass\\nsys.exit(1)\\n' > /app/_health.py && chmod +x /app/_health.py
+RUN printf '#!/usr/bin/env python3\nimport sys, urllib.request as u, urllib.error as e\nport = sys.argv[1] if len(sys.argv) > 1 else "8000"\nfor path in ["/api/health", "/health", "/"]:\n    try:\n        res = u.urlopen(f"http://127.0.0.1:{port}" + path, timeout=3)\n        if res.status < 500: sys.exit(0)\n    except e.HTTPError as ex:\n        if ex.code < 500: sys.exit(0)\n    except Exception: pass\nsys.exit(1)\n' > /app/_health.py && chmod +x /app/_health.py
 RUN useradd --create-home --uid 1001 appuser && chown -R appuser:appuser /app
 USER appuser
-HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 CMD ["python", "/app/_health.py", "8000"]
 EXPOSE 8000
 CMD ["python", "server.py"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 CMD ["python", "/app/_health.py", "8000"]

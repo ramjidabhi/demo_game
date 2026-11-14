@@ -27,13 +27,11 @@ secrets/
 *.pem
 *.key
 
-# DevSecOps, cloud infrastructure and deployment manifests are not part of the app image
+# Keep local infrastructure state, plans, and DevOps tooling out of the app image
 devops-tools
 infrastructure
 k8s
 demogame
-
-# Local developer and security artifacts
 .sonar
 .coverage
 coverage.xml
@@ -43,4 +41,3 @@ rendered-manifests.yaml
 *.tfstate.*
 *.tfvars
 tfplan*
-
