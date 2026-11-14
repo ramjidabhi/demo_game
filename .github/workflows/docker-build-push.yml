@@ -1,4 +1,5 @@
-﻿name: CYBER VIPER DevSecOps CI
+﻿
+name: CYBER VIPER DevSecOps CI
 
 on:
   push:
@@ -11,8 +12,9 @@ permissions:
   contents: read
 
 jobs:
+
   # ==========================================
-  # JOB 1: DOCKER BUILD, TEST, SECURITY SCAN
+  # JOB 1: DOCKER BUILD, TEST AND SECURITY SCAN
   # ==========================================
 
   validate-test-scan:
@@ -24,10 +26,9 @@ jobs:
       IMAGE: cyber-viper:${{ github.sha }}
 
     steps:
+
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      # Kubernetes and Helm removed.
 
       # ======================================
       # TRIVY FILESYSTEM SCAN
@@ -156,7 +157,7 @@ jobs:
             http://127.0.0.1:18000/api/stats \
             | grep -q "total_games"
 
-          echo "PASS: Docker container and application endpoints are healthy."
+          echo "PASS: Docker container and endpoints are healthy."
 
       # ======================================
       # DOCKER HUB LOGIN
@@ -183,20 +184,20 @@ jobs:
 
           REMOTE_IMAGE="${DOCKERHUB_USERNAME}/cyber-viper"
 
-          echo "Tagging Docker image..."
+          echo "Tagging Docker images..."
 
           docker tag "$IMAGE" "${REMOTE_IMAGE}:${GITHUB_SHA}"
           docker tag "$IMAGE" "${REMOTE_IMAGE}:latest"
 
-          echo "Pushing versioned Docker image..."
+          echo "Pushing versioned image..."
 
           docker push "${REMOTE_IMAGE}:${GITHUB_SHA}"
 
-          echo "Pushing latest Docker image..."
+          echo "Pushing latest image..."
 
           docker push "${REMOTE_IMAGE}:latest"
 
-          echo "PASS: Docker images successfully pushed to Docker Hub."
+          echo "PASS: Images successfully pushed to Docker Hub."
 
       # ======================================
       # SECURITY REPORT
@@ -209,12 +210,12 @@ jobs:
           set -u
 
           echo "======================================"
-          echo "CYBER VIPER SECURITY SCAN SUMMARY"
+          echo "CYBER VIPER SECURITY SUMMARY"
           echo "======================================"
 
           if [ -s trivy-fs-report.json ]; then
 
-            echo "Filesystem scan:"
+            echo "Filesystem findings:"
 
             jq '
               [
@@ -241,7 +242,7 @@ jobs:
 
           if [ -s trivy-image-report.json ]; then
 
-            echo "Docker image scan:"
+            echo "Docker image findings:"
 
             jq '
               [
@@ -259,11 +260,12 @@ jobs:
             ' trivy-image-report.json
 
           else
-            echo "WARNING: Docker image report missing."
+            echo "WARNING: Image report missing."
           fi
 
           echo "======================================"
-          echo "Security findings are non-blocking."
+          echo "Security findings are report-only."
+          echo "Pipeline continues."
           echo "======================================"
 
       # ======================================
@@ -282,20 +284,29 @@ jobs:
           retention-days: 14
 
   # ==========================================
-  # JOB 2: SONARQUBE ANALYSIS
+  # JOB 2: SONARQUBE CLOUD ANALYSIS
   # ==========================================
 
-  
   sonarqube-analysis:
     name: SonarQube Cloud code quality analysis
     runs-on: ubuntu-latest
     needs: validate-test-scan
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' ||
+       github.event_name == 'workflow_dispatch')
     timeout-minutes: 20
 
     steps:
+
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # ======================================
+      # JAVA 21
+      # ======================================
 
       - name: Set up Java 21
         uses: actions/setup-java@v4
@@ -307,6 +318,10 @@ jobs:
         run: |
           java -version
 
+      # ======================================
+      # SONARQUBE CLOUD SCAN
+      # ======================================
+
       - name: SonarQube Cloud analysis
         uses: SonarSource/sonarqube-scan-action@v8
         env:
@@ -314,6 +329,15 @@ jobs:
         with:
           args: >
             -Dsonar.projectKey=cyber-viper
-            -Dsonar.organization=ram55o
+            -Dsonar.organization=YOUR_ACTUAL_ORGANIZATION_KEY
             -Dsonar.sources=.
             -Dsonar.scanner.skipJreProvisioning=false
+            -Dsonar.qualitygate.wait=false
+
+      - name: SonarQube analysis summary
+        if: success()
+        run: |
+          echo "======================================"
+          echo "SONARQUBE CLOUD ANALYSIS UPLOADED"
+          echo "======================================"
+          echo "Check SonarQube Cloud for analysis results."
