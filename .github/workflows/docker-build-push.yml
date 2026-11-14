@@ -289,61 +289,32 @@ jobs:
   # JOB 2: SONARQUBE ANALYSIS
   # ==========================================
 
+  
   sonarqube-analysis:
     name: SonarQube code quality analysis
-
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-
-    runs-on: [self-hosted, windows, x64]
-
+    runs-on: ubuntu-latest
     needs: validate-test-scan
-
     timeout-minutes: 20
 
     steps:
-
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ======================================
-      # VERIFY SONARQUBE
-      # ======================================
-
-      - name: Verify local DevOps network and token
-        shell: pwsh
+      - name: Verify SonarQube token
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
-
-          if ([string]::IsNullOrWhiteSpace($env:SONAR_TOKEN)) {
-            throw "Add SONAR_TOKEN as a GitHub Actions repository secret."
-          }
-
-          docker network inspect devops-tools_default *> $null
-
-          if ($LASTEXITCODE -ne 0) {
-            throw "Start the local DevOps stack before running this job."
-          }
-
-      # ======================================
-      # RUN SONARQUBE SCANNER
-      # ======================================
+          if [ -z "$SONAR_TOKEN" ]; then
+            echo "SONAR_TOKEN is missing."
+            exit 1
+          fi
 
       - name: Run SonarQube Scanner
-        shell: pwsh
+        uses: SonarSource/sonarqube-scan-action@v6
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        run: |
-
-          docker run --rm `
-            --network devops-tools_default `
-            -e SONAR_HOST_URL="http://sonarqube:9000" `
-            -e SONAR_TOKEN `
-            -v "$($env:GITHUB_WORKSPACE):/usr/src" `
-            -w /usr/src `
-            sonarsource/sonar-scanner-cli:latest
-
-      - name: SonarQube analysis completed
-        shell: pwsh
-        run: |
-          Write-Host "PASS: SonarQube analysis completed."
+        with:
+          args: >
+            -Dsonar.projectKey=cyber-viper
+            -Dsonar.sources=.
