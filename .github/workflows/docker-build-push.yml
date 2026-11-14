@@ -285,6 +285,7 @@ jobs:
   # JOB 2: SONARQUBE ANALYSIS
   # ==========================================
 
+  
   sonarqube-analysis:
     name: SonarQube Cloud code quality analysis
     runs-on: ubuntu-latest
@@ -300,14 +301,14 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "21"
+          java-version: '21'
 
       - name: Verify Java version
         run: |
           java -version
 
       - name: SonarQube Cloud analysis
-        uses: SonarSource/sonarqube-scan-action@v6
+        uses: SonarSource/sonarqube-scan-action@v8
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         with:
@@ -315,3 +316,4 @@ jobs:
             -Dsonar.projectKey=cyber-viper
             -Dsonar.organization=YOUR_ORGANIZATION
             -Dsonar.sources=.
+            -Dsonar.scanner.skipJreProvisioning=false
