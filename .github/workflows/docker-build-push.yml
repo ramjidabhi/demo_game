@@ -12,6 +12,11 @@ permissions:
   contents: read
 
 jobs:
+
+  # ==========================================
+  # JOB 1: DOCKER BUILD, TEST, SECURITY SCAN
+  # ==========================================
+
   validate-test-scan:
     name: Docker tests and Trivy scans
     runs-on: ubuntu-latest
@@ -21,10 +26,15 @@ jobs:
       IMAGE: cyber-viper:${{ github.sha }}
 
     steps:
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Kubernetes and Helm steps removed.
+      # Kubernetes and Helm removed.
+
+      # ======================================
+      # TRIVY FILESYSTEM SCAN
+      # ======================================
 
       - name: Scan source, dependencies, secrets and configuration
         uses: aquasecurity/trivy-action@v0.36.0
@@ -39,9 +49,17 @@ jobs:
           output: trivy-fs-report.json
           skip-dirs: .git,.terraform,__pycache__,.venv,venv
 
+      # ======================================
+      # DOCKER BUILD
+      # ======================================
+
       - name: Build application Docker image
         run: |
           docker build --pull --tag "$IMAGE" .
+
+      # ======================================
+      # PYTHON COMPILATION
+      # ======================================
 
       - name: Compile Python code inside Docker image
         run: |
@@ -50,12 +68,20 @@ jobs:
             "$IMAGE" \
             python -m compileall -q server.py database.py test_suite.py
 
+      # ======================================
+      # APPLICATION TESTS
+      # ======================================
+
       - name: Run application tests inside Docker image
         run: |
           docker run --rm \
             --env SQLITE_PATH=/tmp/cyber-viper-tests.db \
             "$IMAGE" \
             python test_suite.py
+
+      # ======================================
+      # TRIVY DOCKER IMAGE SCAN
+      # ======================================
 
       - name: Scan Docker image with Trivy
         uses: aquasecurity/trivy-action@v0.36.0
@@ -68,6 +94,10 @@ jobs:
           exit-code: "0"
           format: json
           output: trivy-image-report.json
+
+      # ======================================
+      # DOCKER HEALTH CHECK
+      # ======================================
 
       - name: Run application container and verify health
         shell: bash
@@ -92,6 +122,7 @@ jobs:
           echo "Waiting for Docker HEALTHCHECK..."
 
           for attempt in $(seq 1 40); do
+
             STATUS=$(docker inspect \
               --format='{{.State.Health.Status}}' \
               "$CONTAINER_NAME")
@@ -130,6 +161,50 @@ jobs:
 
           echo "PASS: Docker container and application endpoints are healthy."
 
+      # ======================================
+      # DOCKER HUB LOGIN
+      # ======================================
+
+      - name: Login to Docker Hub
+        if: github.ref == 'refs/heads/main'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # ======================================
+      # PUSH IMAGE TO DOCKER HUB
+      # ======================================
+
+      - name: Push Docker image to Docker Hub
+        if: github.ref == 'refs/heads/main'
+        shell: bash
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+        run: |
+          set -Eeuo pipefail
+
+          REMOTE_IMAGE="${DOCKERHUB_USERNAME}/cyber-viper"
+
+          echo "Tagging Docker image..."
+
+          docker tag "$IMAGE" "${REMOTE_IMAGE}:${GITHUB_SHA}"
+          docker tag "$IMAGE" "${REMOTE_IMAGE}:latest"
+
+          echo "Pushing versioned Docker image..."
+
+          docker push "${REMOTE_IMAGE}:${GITHUB_SHA}"
+
+          echo "Pushing latest Docker image..."
+
+          docker push "${REMOTE_IMAGE}:latest"
+
+          echo "PASS: Docker images successfully pushed to Docker Hub."
+
+      # ======================================
+      # SECURITY REPORT
+      # ======================================
+
       - name: Report HIGH and CRITICAL security findings
         if: always()
         shell: bash
@@ -141,6 +216,7 @@ jobs:
           echo "======================================"
 
           if [ -s trivy-fs-report.json ]; then
+
             echo "Filesystem scan:"
 
             jq '
@@ -161,11 +237,13 @@ jobs:
                 findings: .
               }
             ' trivy-fs-report.json
+
           else
             echo "WARNING: Filesystem report missing."
           fi
 
           if [ -s trivy-image-report.json ]; then
+
             echo "Docker image scan:"
 
             jq '
@@ -182,14 +260,18 @@ jobs:
                 findings: .
               }
             ' trivy-image-report.json
+
           else
             echo "WARNING: Docker image report missing."
           fi
 
           echo "======================================"
           echo "Security findings are non-blocking."
-          echo "Continuing pipeline."
           echo "======================================"
+
+      # ======================================
+      # UPLOAD SECURITY REPORTS
+      # ======================================
 
       - name: Upload Trivy reports
         if: always()
@@ -202,22 +284,37 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
+
+  # ==========================================
+  # JOB 2: SONARQUBE ANALYSIS
+  # ==========================================
+
   sonarqube-analysis:
     name: SonarQube code quality analysis
-    if: ${{ vars.SONARQUBE_LOCAL == 'true' && github.event_name == 'push' }}
+
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
     runs-on: [self-hosted, windows, x64]
+
     needs: validate-test-scan
+
     timeout-minutes: 20
 
     steps:
+
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      # ======================================
+      # VERIFY SONARQUBE
+      # ======================================
 
       - name: Verify local DevOps network and token
         shell: pwsh
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
+
           if ([string]::IsNullOrWhiteSpace($env:SONAR_TOKEN)) {
             throw "Add SONAR_TOKEN as a GitHub Actions repository secret."
           }
@@ -228,11 +325,16 @@ jobs:
             throw "Start the local DevOps stack before running this job."
           }
 
+      # ======================================
+      # RUN SONARQUBE SCANNER
+      # ======================================
+
       - name: Run SonarQube Scanner
         shell: pwsh
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
+
           docker run --rm `
             --network devops-tools_default `
             -e SONAR_HOST_URL="http://sonarqube:9000" `
@@ -240,3 +342,8 @@ jobs:
             -v "$($env:GITHUB_WORKSPACE):/usr/src" `
             -w /usr/src `
             sonarsource/sonar-scanner-cli:latest
+
+      - name: SonarQube analysis completed
+        shell: pwsh
+        run: |
+          Write-Host "PASS: SonarQube analysis completed."
